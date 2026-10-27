@@ -3,25 +3,12 @@
  * A single-row Lovelace card that turns any numeric sensor into a five-zone status row:
  * icon, name, status label, value, a coloured zone bar with a position dot, and a badge
  * on the lowest / highest sensor of a group.
- *
- * Modes (presets): temperature, humidity, co2, pm25, pm10, aqi, battery, cpu, ram, custom.
- * Omit `mode` (or use `auto`) to detect it from the sensor.
- *
- * Zones and thresholds (the same for every mode):
- *   zone 1  value <  very_low
- *   zone 2  value <  low
- *   zone 3  value <= high
- *   zone 4  value <= very_high
- *   zone 5  value >  very_high
- *
- * Shows up under "Community" in the card picker's "By entity" tab (Home Assistant 2026.6+)
- * via `getEntitySuggestion` on the window.customCards entry.
  */
 
 const CARD_TAG = "sensor-status-card";
 const EDITOR_TAG = "sensor-status-card-editor";
 const CARD_NAME = "Sensor Status Card";
-const CARD_VERSION = "0.1.1-beta";
+const CARD_VERSION = "0.2.0-beta";
 
 // Fallback/Default colors used when no explicit color or zone is provided.
 const COLOR_MAP = {
@@ -44,7 +31,6 @@ const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const clamp = (n, a, b) => Math.min(Math.max(n, a), b);
 
-// Battery icon that follows the charge level (mdi:battery-10 ... mdi:battery-90).
 const batteryIcon = (v) => {
   const n = Math.round(clamp(v, 0, 100) / 10) * 10;
   if (n <= 0) return "mdi:battery-outline";
@@ -52,8 +38,6 @@ const batteryIcon = (v) => {
   return `mdi:battery-${n}`;
 };
 
-// Defaults per mode. Every threshold, label, color, scale and unit can be overridden per card.
-// Air quality and battery values are common guideline breakpoints; adjust them to taste.
 const PRESETS = {
   temperature: {
     icon: "mdi:thermometer",
@@ -164,7 +148,6 @@ const PRESETS = {
     zones: ["green", "lime", "yellow", "orange", "red"],
     thresholds: { very_low: 30, low: 60, high: 85, very_high: 95 },
   },
-  // Neutral preset for any other numeric sensor. Set your own thresholds, scale and labels.
   custom: {
     icon: "mdi:gauge",
     unit: "",
@@ -179,8 +162,6 @@ const PRESETS = {
   },
 };
 
-// ---------- Entity detection (used by the card picker and the "auto" mode) ----------
-// Device class -> mode. Used for suggestions and to filter the editor's sensor picker.
 const MODE_DEVICE_CLASS = {
   temperature: "temperature",
   humidity: "humidity",
@@ -192,11 +173,9 @@ const MODE_DEVICE_CLASS = {
 };
 const DEVICE_CLASS_MODE = Object.fromEntries(Object.entries(MODE_DEVICE_CLASS).map(([m, d]) => [d, m]));
 
-// Whole-word matches so "program" or "diagram" don't count as "ram".
 const RAM_RE = /(?:^|[^a-z])(ram|memory|mem|swap)(?:[^a-z]|$)/;
 const CPU_RE = /(?:^|[^a-z])(cpu|processor)(?:[^a-z]|$)/;
 
-/** Returns the matching mode for a sensor, or null when the card isn't a good fit. */
 const detectMode = (hass, entityId) => {
   if (typeof entityId !== "string" || !entityId.startsWith("sensor.")) return null;
   const st = hass?.states?.[entityId];
@@ -205,7 +184,6 @@ const detectMode = (hass, entityId) => {
   const dc = st.attributes?.device_class;
   if (dc) return DEVICE_CLASS_MODE[dc] || null;
 
-  // No device class: CPU / RAM usage sensors are recognised by name and a percent unit.
   const unit = st.attributes?.unit_of_measurement;
   if (unit !== undefined && unit !== "%") return null;
   const text = `${entityId} ${st.attributes?.friendly_name ?? ""}`.toLowerCase();
@@ -214,7 +192,6 @@ const detectMode = (hass, entityId) => {
   return null;
 };
 
-/** Active preset name: explicit mode, else detected from the sensor, else "custom". */
 const resolveMode = (hass, config) => {
   const m = config?.mode;
   if (m && m !== "auto") return m;
@@ -295,7 +272,6 @@ class SensorStatusCard extends HTMLElement {
           display: flex;
           color: var(--ssc-color);
           --mdc-icon-size: 20px;
-          margin-bottom: 0px;
         }
         .type {
           flex: none;
@@ -368,12 +344,10 @@ class SensorStatusCard extends HTMLElement {
     });
   }
 
-  // ---------- Lovelace API ----------
   static getConfigElement() {
     return document.createElement(EDITOR_TAG);
   }
 
-  // Used by the "By card" tab. Signature: (hass, entities, entitiesFallback).
   static getStubConfig(hass, entities, entitiesFallback) {
     const pool = [
       ...(Array.isArray(entities) ? entities : []),
@@ -384,7 +358,6 @@ class SensorStatusCard extends HTMLElement {
     return { entity, mode: detectMode(hass, entity) || "temperature" };
   }
 
-  // Used by the "By entity" tab (Home Assistant 2026.6+), see window.customCards below.
   static getEntitySuggestion(hass, entityId) {
     const mode = detectMode(hass, entityId);
     if (!mode) return null;
@@ -421,12 +394,10 @@ class SensorStatusCard extends HTMLElement {
     return { columns: 12, rows: 1, min_columns: 6, min_rows: 1 };
   }
 
-  // ---------- Resolvers ----------
   _mode() {
     return resolveMode(this._hass, this._config);
   }
 
-  // Free text, or the state of an entity when the value is an entity ID.
   _textValue(spec) {
     if (spec === undefined || spec === null || spec === "") return "";
     const s = String(spec);
@@ -462,35 +433,11 @@ class SensorStatusCard extends HTMLElement {
     return null;
   }
 
-  // Each threshold is a number or a sensor entity ID; empty values use the preset default.
   _thresholds(preset) {
     const t = this._config.thresholds || {};
     const out = {};
     for (const key of THRESHOLD_KEYS) out[key] = this._num(t[key]) ?? preset.thresholds[key];
     return out;
-  }
-
-  _colorMap(preset) {
-    const map = {};
-    preset.labels.forEach((label, i) => (map[label] = this._color(preset.zones[i])));
-    let gray = this._color("gray");
-
-    const entId = this._config.color_map_entity;
-    if (entId && this._hass?.states[entId]) {
-      const ent = this._hass.states[entId];
-      Object.assign(map, ent.attributes?.colors || {});
-      if (ent.attributes?.default_gray) gray = this._color(ent.attributes.default_gray);
-    }
-
-    if (this._config.color_map) {
-      for (const [k, v] of Object.entries(this._config.color_map)) {
-        map[k] = this._color(v) || v;
-      }
-    }
-    if (this._config.default_color) {
-      gray = this._color(this._config.default_color) || gray;
-    }
-    return { map, gray };
   }
 
   _compareIds() {
@@ -499,7 +446,6 @@ class SensorStatusCard extends HTMLElement {
     return list.includes(this._config.entity) ? list : [...list, this._config.entity];
   }
 
-  // ---------- Model ----------
   _compute() {
     const cfg = this._config;
     const hass = this._hass;
@@ -507,9 +453,16 @@ class SensorStatusCard extends HTMLElement {
     const preset = PRESETS[mode];
     const stateObj = hass?.states[cfg.entity];
     const labels = Array.isArray(cfg.labels) && cfg.labels.length === 5 ? cfg.labels : preset.labels;
-    const zoneSpecs = Array.isArray(cfg.zone_colors) && cfg.zone_colors.length === 5 ? cfg.zone_colors : preset.zones;
+    
+    const zoneSpecs = [
+      cfg.zone_1 ?? cfg.zone_colors?.[0] ?? preset.zones[0],
+      cfg.zone_2 ?? cfg.zone_colors?.[1] ?? preset.zones[1],
+      cfg.zone_3 ?? cfg.zone_colors?.[2] ?? preset.zones[2],
+      cfg.zone_4 ?? cfg.zone_colors?.[3] ?? preset.zones[3],
+      cfg.zone_5 ?? cfg.zone_colors?.[4] ?? preset.zones[4],
+    ];
     const zones = zoneSpecs.map((z) => this._color(z) || COLOR_MAP.gray);
-    const { map, gray } = this._colorMap(preset);
+    const gray = this._color("gray") || COLOR_MAP.gray;
 
     const raw = stateObj ? parseFloat(stateObj.state) : NaN;
     const valid = Number.isFinite(raw);
@@ -519,7 +472,6 @@ class SensorStatusCard extends HTMLElement {
     let lo = this._num(cfg.scale_min) ?? preset.scale_min;
     let hi = this._num(cfg.scale_max) ?? preset.scale_max;
     if (!(hi > lo)) {
-      // Guard against a zero/negative range (would divide by zero).
       lo = preset.scale_min;
       hi = preset.scale_max;
     }
@@ -530,7 +482,7 @@ class SensorStatusCard extends HTMLElement {
     let idx = -1;
     if (valid) idx = raw < vl ? 0 : raw < low ? 1 : raw <= high ? 2 : raw <= vh ? 3 : 4;
     const status = idx >= 0 ? labels[idx] : "";
-    const color = valid ? map[status] || zones[idx] || gray : gray;
+    const color = valid ? zones[idx] || gray : gray;
 
     let isMin = false;
     let isMax = false;
@@ -561,7 +513,6 @@ class SensorStatusCard extends HTMLElement {
         .join(",") +
       ")";
 
-    // Battery type badge (battery mode only): free text or the state of an entity.
     const typeBadge = mode === "battery" ? this._textValue(cfg.battery_type) : "";
 
     const icon =
@@ -583,7 +534,6 @@ class SensorStatusCard extends HTMLElement {
     };
   }
 
-  // ---------- Rendering ----------
   _render() {
     if (!this._config || !this._hass) return;
     const m = this._compute();
@@ -606,7 +556,6 @@ class SensorStatusCard extends HTMLElement {
     );
   }
 
-  // ---------- Actions ----------
   _fire(type, detail) {
     this.dispatchEvent(new CustomEvent(type, { detail, bubbles: true, composed: true }));
   }
@@ -653,6 +602,8 @@ const EDITOR_LABELS = {
   icon: "Icon",
   show_min_max: "Show lowest / highest badge",
   compare_entities: "Sensors to compare",
+  min_icon: "Minimum badge icon",
+  max_icon: "Maximum badge icon",
   battery_type: "Battery type (text or entity ID)",
   tap_action: "Tap action",
   thresholds: "Thresholds",
@@ -660,8 +611,11 @@ const EDITOR_LABELS = {
   low: "Low (below)",
   high: "High (above)",
   very_high: "Very high (above)",
-  color_map: "Color map (YAML, label: color)",
-  color_map_entity: "Color map sensor",
+  zone_1: "Zone 1 (Very low) color",
+  zone_2: "Zone 2 (Low) color",
+  zone_3: "Zone 3 (Normal) color",
+  zone_4: "Zone 4 (High) color",
+  zone_5: "Zone 5 (Very high) color",
   unit: "Unit override",
   decimals: "Decimals",
   scale_min: "Scale minimum",
@@ -682,62 +636,77 @@ const MODE_OPTIONS = [
   { value: "custom", label: "Custom" },
 ];
 
-// Sensor picker, narrowed to the matching device class when the mode has one.
 const sensorSelector = (mode, extra = {}) => {
   const dc = MODE_DEVICE_CLASS[mode];
   return { entity: { domain: "sensor", ...(dc ? { device_class: dc } : {}), ...extra } };
 };
 
-const getEditorSchema = (mode) => [
-  { name: "entity", required: true, selector: sensorSelector(mode) },
-  { name: "mode", selector: { select: { mode: "dropdown", options: MODE_OPTIONS } } },
-  { name: "name", selector: { text: {} } },
-  { name: "icon", selector: { icon: {} } },
-  { name: "tap_action", selector: { ui_action: {} } },
-  {
-    type: "expandable",
-    name: "thresholds",
-    title: "Thresholds (number or entity ID; empty uses defaults)",
-    schema: [
-      { name: "very_low", selector: { text: {} } },
-      { name: "low", selector: { text: {} } },
-      { name: "high", selector: { text: {} } },
-      { name: "very_high", selector: { text: {} } },
-    ],
-  },
-  {
-    type: "expandable",
-    name: "advanced",
-    title: "Colors and display",
-    flatten: true,
-    schema: [
-      { name: "color_map", selector: { object: {} } },
-      { name: "color_map_entity", selector: { entity: { domain: "sensor" } } },
-      { name: "unit", selector: { text: {} } },
-      { name: "decimals", selector: { number: { min: 0, max: 3, mode: "box" } } },
-      { name: "scale_min", selector: { number: { mode: "box" } } },
-      { name: "scale_max", selector: { number: { mode: "box" } } },
-    ],
-  },
-];
-
-// Builds the editor form. Some fields only appear when they apply:
-// - battery type: battery mode only
-// - sensors to compare: only when the lowest / highest badge is switched on
-const buildEditorSchema = (config, hass) => {
+const getEditorSchema = (config, hass) => {
   const mode = config.mode || "auto";
-  const fields = getEditorSchema(mode);
-  const extra = [];
-  if (resolveMode(hass, config) === "battery") {
-    extra.push({ name: "battery_type", selector: { text: {} } });
-  }
-  extra.push({ name: "show_min_max", selector: { boolean: {} } });
-  if (config.show_min_max === true) {
-    extra.push({ name: "compare_entities", selector: sensorSelector(mode, { multiple: true }) });
-  }
-  const at = fields.findIndex((f) => f.name === "icon");
-  fields.splice(at + 1, 0, ...extra);
-  return fields;
+  const showMinMax = config.show_min_max === true;
+  const isBattery = resolveMode(hass, config) === "battery";
+
+  return [
+    { name: "entity", required: true, selector: sensorSelector(mode) },
+    { name: "mode", selector: { select: { mode: "dropdown", options: MODE_OPTIONS } } },
+    { name: "name", selector: { text: {} } },
+    { name: "icon", selector: { icon: {} } },
+    ...(isBattery ? [{ name: "battery_type", selector: { text: {} } }] : []),
+    { name: "tap_action", selector: { ui_action: {} } },
+    {
+      type: "expandable",
+      name: "thresholds",
+      title: "Thresholds",
+      schema: [
+        { name: "disclaimer", type: "label", label: "(number or entity ID; empty uses defaults)" },
+        { name: "very_low", selector: { text: {} } },
+        { name: "low", selector: { text: {} } },
+        { name: "high", selector: { text: {} } },
+        { name: "very_high", selector: { text: {} } },
+      ],
+    },
+    {
+      type: "expandable",
+      name: "colors_section",
+      title: "Colors",
+      flatten: true,
+      schema: [
+        { name: "zone_1", selector: { text: {} } },
+        { name: "zone_2", selector: { text: {} } },
+        { name: "zone_3", selector: { text: {} } },
+        { name: "zone_4", selector: { text: {} } },
+        { name: "zone_5", selector: { text: {} } },
+      ],
+    },
+    {
+      type: "expandable",
+      name: "display_section",
+      title: "Display settings",
+      flatten: true,
+      schema: [
+        { name: "unit", selector: { text: {} } },
+        { name: "decimals", selector: { number: { min: 0, max: 3, mode: "box" } } },
+        { name: "scale_min", selector: { number: { mode: "box" } } },
+        { name: "scale_max", selector: { number: { mode: "box" } } },
+      ],
+    },
+    {
+      type: "expandable",
+      name: "comparison_section",
+      title: "Comparison",
+      flatten: true,
+      schema: [
+        { name: "show_min_max", selector: { boolean: {} } },
+        ...(showMinMax
+          ? [
+              { name: "compare_entities", selector: sensorSelector(mode, { multiple: true }) },
+              { name: "min_icon", selector: { icon: {} } },
+              { name: "max_icon", selector: { icon: {} } },
+            ]
+          : []),
+      ],
+    },
+  ];
 };
 
 const prune = (obj) => {
@@ -784,12 +753,11 @@ class SensorStatusCardEditor extends HTMLElement {
       this.appendChild(this._form);
     }
     this._form.hass = this._hass;
-    this._form.schema = buildEditorSchema(this._config, this._hass);
+    this._form.schema = getEditorSchema(this._config, this._hass);
     this._form.data = { mode: "auto", ...this._config };
   }
 }
 
-// Guard against double-loading (e.g. the resource being registered twice).
 if (!customElements.get(CARD_TAG)) customElements.define(CARD_TAG, SensorStatusCard);
 if (!customElements.get(EDITOR_TAG)) customElements.define(EDITOR_TAG, SensorStatusCardEditor);
 
@@ -801,7 +769,6 @@ if (!window.customCards.some((c) => c.type === CARD_TAG)) {
     description:
       "Any numeric sensor as a status row: temperature, humidity, air quality, battery, CPU, RAM or custom, with a five-zone bar and lowest/highest badge.",
     preview: true,
-    // Home Assistant 2026.6+: lists this card under "Community" in the "By entity" tab.
     getEntitySuggestion: (hass, entityId) => SensorStatusCard.getEntitySuggestion(hass, entityId),
   });
 }
