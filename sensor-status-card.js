@@ -21,7 +21,7 @@
 const CARD_TAG = "sensor-status-card";
 const EDITOR_TAG = "sensor-status-card-editor";
 const CARD_NAME = "Sensor Status Card";
-const CARD_VERSION = "0.1.0-beta";
+const CARD_VERSION = "0.1.1-beta";
 
 // Fallback/Default colors used when no explicit color or zone is provided.
 const COLOR_MAP = {
@@ -214,6 +214,13 @@ const detectMode = (hass, entityId) => {
   return null;
 };
 
+/** Active preset name: explicit mode, else detected from the sensor, else "custom". */
+const resolveMode = (hass, config) => {
+  const m = config?.mode;
+  if (m && m !== "auto") return m;
+  return detectMode(hass, config?.entity) || "custom";
+};
+
 class SensorStatusCard extends HTMLElement {
   constructor() {
     super();
@@ -289,6 +296,22 @@ class SensorStatusCard extends HTMLElement {
           color: var(--ssc-color);
           --mdc-icon-size: 20px;
           margin-bottom: 0px;
+        }
+        .type {
+          flex: none;
+          max-width: 90px;
+          box-sizing: border-box;
+          padding: 2px 8px;
+          border-radius: 10px;
+          font-size: 11px;
+          font-weight: 600;
+          line-height: 1.4;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          color: var(--ssc-color);
+          background: color-mix(in srgb, var(--ssc-color) 20%, transparent);
+          border: 1px solid color-mix(in srgb, var(--ssc-color) 45%, transparent);
         }
         .value {
           font-size: 1rem;
@@ -399,11 +422,19 @@ class SensorStatusCard extends HTMLElement {
   }
 
   // ---------- Resolvers ----------
-  // Resolves the active preset name: explicit mode, else detected from the sensor, else "custom".
   _mode() {
-    const m = this._config.mode;
-    if (m && m !== "auto") return m;
-    return detectMode(this._hass, this._config.entity) || "custom";
+    return resolveMode(this._hass, this._config);
+  }
+
+  // Free text, or the state of an entity when the value is an entity ID.
+  _textValue(spec) {
+    if (spec === undefined || spec === null || spec === "") return "";
+    const s = String(spec);
+    if (ENTITY_ID.test(s) && this._hass?.states[s]) {
+      const st = this._hass.states[s].state;
+      return UNAVAILABLE.includes(st) ? "" : String(st);
+    }
+    return s;
   }
 
   _color(spec) {
@@ -434,12 +465,8 @@ class SensorStatusCard extends HTMLElement {
   // Each threshold is a number or a sensor entity ID; empty values use the preset default.
   _thresholds(preset) {
     const t = this._config.thresholds || {};
-    // Legacy keys from Room Comfort Card / Resource Usage Card
-    // (low, comfort_low, comfort_high, high) are mapped so old YAML keeps working.
-    const legacy = t.comfort_low !== undefined || t.comfort_high !== undefined;
-    const src = legacy ? { very_low: t.low, low: t.comfort_low, high: t.comfort_high, very_high: t.high } : t;
     const out = {};
-    for (const key of THRESHOLD_KEYS) out[key] = this._num(src[key]) ?? preset.thresholds[key];
+    for (const key of THRESHOLD_KEYS) out[key] = this._num(t[key]) ?? preset.thresholds[key];
     return out;
   }
 
@@ -476,7 +503,8 @@ class SensorStatusCard extends HTMLElement {
   _compute() {
     const cfg = this._config;
     const hass = this._hass;
-    const preset = PRESETS[this._mode()];
+    const mode = this._mode();
+    const preset = PRESETS[mode];
     const stateObj = hass?.states[cfg.entity];
     const labels = Array.isArray(cfg.labels) && cfg.labels.length === 5 ? cfg.labels : preset.labels;
     const zoneSpecs = Array.isArray(cfg.zone_colors) && cfg.zone_colors.length === 5 ? cfg.zone_colors : preset.zones;
@@ -506,7 +534,7 @@ class SensorStatusCard extends HTMLElement {
 
     let isMin = false;
     let isMax = false;
-    if (valid && hass) {
+    if (cfg.show_min_max === true && valid && hass) {
       const vals = this._compareIds()
         .map((id) => parseFloat(hass.states[id]?.state))
         .filter((n) => Number.isFinite(n));
@@ -533,6 +561,9 @@ class SensorStatusCard extends HTMLElement {
         .join(",") +
       ")";
 
+    // Battery type badge (battery mode only): free text or the state of an entity.
+    const typeBadge = mode === "battery" ? this._textValue(cfg.battery_type) : "";
+
     const icon =
       cfg.icon ??
       (valid && preset.dynamicIcon ? preset.dynamicIcon(raw) : null) ??
@@ -542,6 +573,7 @@ class SensorStatusCard extends HTMLElement {
     return {
       name: cfg.name ?? stateObj?.attributes?.friendly_name ?? cfg.entity,
       icon,
+      typeBadge,
       status,
       value: valid ? [raw.toFixed(decimals), unit].filter(Boolean).join(" ") : "--",
       color,
@@ -565,9 +597,13 @@ class SensorStatusCard extends HTMLElement {
     this._text.innerHTML = `<div class="name">${esc(m.name)}</div><div class="status">${esc(m.status)}</div>`;
     this._end.innerHTML =
       (m.extreme ? `<div class="extreme"><ha-icon icon="${esc(m.extreme)}"></ha-icon></div>` : "") +
+      (m.typeBadge ? `<div class="type">${esc(m.typeBadge)}</div>` : "") +
       `<div class="value">${esc(m.value)}</div>`;
     this._bar.innerHTML = m.dot === null ? "" : `<div class="dot" style="left:${m.dot.toFixed(2)}%"></div>`;
-    this._card.setAttribute("aria-label", `${m.name}, ${m.value}, ${m.status}`);
+    this._card.setAttribute(
+      "aria-label",
+      `${m.name}, ${m.value}, ${m.status}${m.typeBadge ? `, ${m.typeBadge}` : ""}`
+    );
   }
 
   // ---------- Actions ----------
@@ -615,7 +651,9 @@ const EDITOR_LABELS = {
   mode: "Mode",
   name: "Name",
   icon: "Icon",
-  compare_entities: "Sensors to compare for lowest / highest badge",
+  show_min_max: "Show lowest / highest badge",
+  compare_entities: "Sensors to compare",
+  battery_type: "Battery type (text or entity ID)",
   tap_action: "Tap action",
   thresholds: "Thresholds",
   very_low: "Very low (below)",
@@ -655,7 +693,6 @@ const getEditorSchema = (mode) => [
   { name: "mode", selector: { select: { mode: "dropdown", options: MODE_OPTIONS } } },
   { name: "name", selector: { text: {} } },
   { name: "icon", selector: { icon: {} } },
-  { name: "compare_entities", selector: sensorSelector(mode, { multiple: true }) },
   { name: "tap_action", selector: { ui_action: {} } },
   {
     type: "expandable",
@@ -683,6 +720,25 @@ const getEditorSchema = (mode) => [
     ],
   },
 ];
+
+// Builds the editor form. Some fields only appear when they apply:
+// - battery type: battery mode only
+// - sensors to compare: only when the lowest / highest badge is switched on
+const buildEditorSchema = (config, hass) => {
+  const mode = config.mode || "auto";
+  const fields = getEditorSchema(mode);
+  const extra = [];
+  if (resolveMode(hass, config) === "battery") {
+    extra.push({ name: "battery_type", selector: { text: {} } });
+  }
+  extra.push({ name: "show_min_max", selector: { boolean: {} } });
+  if (config.show_min_max === true) {
+    extra.push({ name: "compare_entities", selector: sensorSelector(mode, { multiple: true }) });
+  }
+  const at = fields.findIndex((f) => f.name === "icon");
+  fields.splice(at + 1, 0, ...extra);
+  return fields;
+};
 
 const prune = (obj) => {
   if (Array.isArray(obj)) return obj;
@@ -717,7 +773,6 @@ class SensorStatusCardEditor extends HTMLElement {
 
   _update() {
     if (!this._config || !this._hass) return;
-    const mode = this._config.mode || "auto";
     if (!this._form) {
       this._form = document.createElement("ha-form");
       this._form.computeLabel = (s) => EDITOR_LABELS[s.name] || s.name;
@@ -729,7 +784,7 @@ class SensorStatusCardEditor extends HTMLElement {
       this.appendChild(this._form);
     }
     this._form.hass = this._hass;
-    this._form.schema = getEditorSchema(mode);
+    this._form.schema = buildEditorSchema(this._config, this._hass);
     this._form.data = { mode: "auto", ...this._config };
   }
 }
