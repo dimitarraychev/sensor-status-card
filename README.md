@@ -1,6 +1,6 @@
 # Sensor Status Card
 
-A single-row Lovelace card that turns any numeric sensor into a five-zone status row. It shows an icon, the name, a status label, the value, a colored zone bar with a position dot, and a badge on the lowest or highest sensor of a group.
+A single-row Lovelace card that turns any numeric sensor into a five-zone status row. It shows an icon, the name, a status label, the value, and a colored zone bar with a position dot. Optionally it adds a lowest / highest badge across a group of sensors and, in battery mode, a battery type badge.
 
 One card covers temperature, humidity, air quality (CO2, PM2.5, PM10, AQI), battery, CPU and RAM, plus a `custom` mode for anything else.
 
@@ -11,9 +11,9 @@ One card covers temperature, humidity, air quality (CO2, PM2.5, PM10, AQI), batt
 - Ten presets with sensible labels, colors, scales and thresholds.
 - Automatic mode detection from the sensor's device class (or CPU/RAM keywords in the name).
 - The same four threshold names for every mode.
-- Battery icon that follows the charge level.
-- Lowest / highest badge across a group of sensors.
-- Visual editor, with a sensor picker that filters by device class.
+- Battery icon that follows the charge level, plus an optional battery type badge.
+- Optional lowest / highest badge across a group of sensors, switched on with one toggle.
+- Visual editor, with a sensor picker that filters by device class. Fields only appear when they apply.
 - Suggested in the card picker's **By entity** tab, under **Community**.
 - Custom labels, zone colors, scale, decimals, unit and tap action.
 
@@ -106,7 +106,52 @@ thresholds:
 | `ram` | 30 | 60 | 85 | 95 |
 | `custom` | 20 | 40 | 60 | 80 |
 
-The temperature, humidity, CPU and RAM values come from the original Room Comfort Card and Resource Usage Card. The air quality and battery values are approximations of common guideline breakpoints (loosely based on WHO and EPA ranges), so adjust them to the guidelines you prefer. The temperature preset is in °C.
+The air quality and battery values are approximations of common guideline breakpoints (loosely based on WHO and EPA ranges), so adjust them to the guidelines you prefer. The temperature preset is in °C.
+
+## Lowest / highest badge
+
+Switch on `show_min_max` to mark the lowest and highest sensor of a group with a small icon next to the value. List the sensors to compare in `compare_entities` and repeat the same list on each card in the group.
+
+```yaml
+type: custom:sensor-status-card
+entity: sensor.bedroom_co2
+mode: co2
+show_min_max: true
+compare_entities:
+  - sensor.office_co2
+  - sensor.bedroom_co2
+  - sensor.living_room_co2
+```
+
+- It is off by default. While it is off, `compare_entities` is ignored, and the visual editor hides the comparison field.
+- The card's own sensor is always included in the comparison.
+- If all compared values are equal, no badge is shown.
+- Override the badge icons with `min_icon` and `max_icon`.
+
+## Battery type badge
+
+In `battery` mode you can show a second, optional badge to the left of the percentage with the battery type (for example `CR2032` or `2 x AAA`). Set `battery_type` to either plain text or an entity ID:
+
+```yaml
+# Plain text
+type: custom:sensor-status-card
+entity: sensor.door_sensor_battery
+mode: battery
+battery_type: CR2032
+```
+
+```yaml
+# From an entity: the badge shows the entity's state
+type: custom:sensor-status-card
+entity: sensor.door_sensor_battery
+mode: battery
+battery_type: sensor.door_sensor_battery_type
+```
+
+- If the value matches an existing entity ID, the card shows that entity's state. Otherwise it shows the text as written.
+- If the entity is `unknown` or `unavailable`, or `battery_type` is empty, no badge is shown.
+- The option only applies in battery mode, and the visual editor only shows the field there. This includes `auto` mode when the sensor has the `battery` device class.
+- Long text is shortened with an ellipsis.
 
 ## Configuration
 
@@ -123,13 +168,15 @@ The temperature, humidity, CPU and RAM values come from the original Room Comfor
 | `thresholds` | object | preset | `very_low`, `low`, `high`, `very_high`. Each is a number or an entity ID. |
 | `labels` | list of 5 | preset | Five status labels, zone 1 to zone 5. |
 | `zone_colors` | list of 5 | preset | Five colors for the zones (see [Colors](#colors)). |
-| `compare_entities` | list | none | Sensors to compare for the lowest / highest badge. |
+| `show_min_max` | boolean | `false` | Show the lowest / highest badge. |
+| `compare_entities` | list | none | Sensors to compare. Only used when `show_min_max` is `true`. |
 | `min_icon` | string | preset | Badge icon for the lowest sensor. |
 | `max_icon` | string | preset | Badge icon for the highest sensor. |
+| `battery_type` | string | none | Battery mode only. Text or an entity ID shown as a badge left of the value. |
 | `color_map` | object | none | Map of label to color, e.g. `Warm: purple`. |
 | `color_map_entity` | entity | none | Sensor whose `colors` attribute supplies a label-to-color map. |
 | `default_color` | string | gray | Color used when the value is unavailable. |
-| `tap_action` | object | `more-info` | Standard Home Assistant tap action (`more-info`, `navigate`, `toggle`, `perform-action`, `url`, `none`). |
+| `tap_action` | object | `more-info` | Standard Home Assistant tap action (`more-info`, `navigate`, `toggle`, `perform-action`, `url`). |
 
 ### Colors
 
@@ -137,7 +184,7 @@ Colors can be a name (`gray`, `cyan`, `blue`, `green`, `lime`, `yellow`, `orange
 
 ## Examples
 
-### Air quality group with a lowest / highest badge
+### Air quality with a lowest / highest badge
 
 ```yaml
 type: vertical-stack
@@ -146,7 +193,8 @@ cards:
     entity: sensor.office_co2
     mode: co2
     name: Office
-    compare_entities:
+    show_min_max: true
+    compare_entities: &rooms
       - sensor.office_co2
       - sensor.bedroom_co2
       - sensor.living_room_co2
@@ -154,13 +202,19 @@ cards:
     entity: sensor.bedroom_co2
     mode: co2
     name: Bedroom
-    compare_entities:
-      - sensor.office_co2
-      - sensor.bedroom_co2
-      - sensor.living_room_co2
+    show_min_max: true
+    compare_entities: *rooms
 ```
 
-The sensor with the lowest value shows the `min_icon` badge and the one with the highest value shows `max_icon`. No badge is shown when all values are equal.
+### Battery with a type badge
+
+```yaml
+type: custom:sensor-status-card
+entity: sensor.door_sensor_battery
+mode: battery
+name: Front door
+battery_type: sensor.door_sensor_battery_type
+```
 
 ### Server CPU with custom labels
 
@@ -207,30 +261,6 @@ tap_action:
   action: navigate
   navigation_path: /config/devices/dashboard
 ```
-
-## Migrating from Room Comfort Card and Resource Usage Card
-
-The `temperature`, `humidity`, `cpu` and `ram` modes keep their names and defaults, so in most cases you only change the `type`:
-
-```yaml
-# Before
-type: custom:room-comfort-card
-# After
-type: custom:sensor-status-card
-```
-
-The old threshold keys map to the new ones:
-
-| Old key | New key |
-| --- | --- |
-| `low` | `very_low` |
-| `comfort_low` | `low` |
-| `comfort_high` | `high` |
-| `high` | `very_high` |
-
-The card accepts the old keys if `comfort_low` or `comfort_high` is present, so existing YAML keeps working. If you only set old `low` and `high`, those are read with the new meanings, so rename them when you can.
-
-When you are done migrating, remove the old card resources so two cards do not register side by side.
 
 ## Card picker suggestions
 
