@@ -1,14 +1,14 @@
 /*!
  * Sensor Status Card
  * A single-row Lovelace card that turns any numeric sensor into a five-zone status row:
- * icon, name, status label, value, a coloured zone bar with a position dot, and a badge
- * on the lowest / highest sensor of a group.
+ * icon, name, status label, value, a coloured zone bar with a position dot, a badge on the
+ * lowest / highest sensor of a group, and a type/size badge for battery and disk modes.
  */
 
 const CARD_TAG = "sensor-status-card";
 const EDITOR_TAG = "sensor-status-card-editor";
 const CARD_NAME = "Sensor Status Card";
-const CARD_VERSION = "0.3.2-beta";
+const CARD_VERSION = "0.3.3-beta";
 
 // Fallback/Default colors used when no explicit color or zone is provided.
 const COLOR_MAP = {
@@ -187,7 +187,7 @@ const DEVICE_CLASS_MODE = Object.fromEntries(Object.entries(MODE_DEVICE_CLASS).m
 
 const RAM_RE = /(?:^|[^a-z])(ram|memory|mem|swap)(?:[^a-z]|$)/;
 const CPU_RE = /(?:^|[^a-z])(cpu|processor)(?:[^a-z]|$)/;
-const DISK_RE = /(disk|storage|filesystem|ssd|hdd|nvme|mmcblk|partition|volume)/;
+const DISK_RE = /(disk|storage|filesystem|ssd|hdd|nvme|mmcblk|partition)/;
 const DRIVE_RE = /(?:^|[^a-z])(sd[a-z]\d*|vd[a-z]\d*|xvd[a-z]\d*|nvme\d+n\d+(?:p\d+)?)(?:[^a-z0-9]|$)/;
 
 const detectMode = (hass, entityId) => {
@@ -259,6 +259,11 @@ class SensorStatusCard extends HTMLElement {
           margin-top: 8px;
           line-height: 1.2;
           margin-left: 2px;
+        }
+        .text.single {
+          align-self: center;
+          margin-top: 0;
+          padding-bottom: 4px;
         }
         .name {
           font-size: 14px;
@@ -508,7 +513,7 @@ class SensorStatusCard extends HTMLElement {
 
     let idx = -1;
     if (valid) idx = raw < vl ? 0 : raw < low ? 1 : raw <= high ? 2 : raw <= vh ? 3 : 4;
-    const status = idx >= 0 ? labels[idx] : "";
+    const status = idx >= 0 && cfg.show_status !== false ? labels[idx] : "";
     const color = valid ? zones[idx] || gray : gray;
 
     let isMin = false;
@@ -541,11 +546,13 @@ class SensorStatusCard extends HTMLElement {
       ")";
 
     const typeBadge =
-      mode === "battery"
-        ? this._textValue(cfg.battery_type)
-        : mode === "disk"
-          ? this._sizeValue(cfg.disk_size)
-          : "";
+      cfg.show_badge === false
+        ? ""
+        : mode === "battery"
+          ? this._textValue(cfg.battery_type)
+          : mode === "disk"
+            ? this._sizeValue(cfg.disk_size)
+            : "";
 
     const icon =
       cfg.icon ??
@@ -577,6 +584,7 @@ class SensorStatusCard extends HTMLElement {
     this._card.style.setProperty("--ssc-bar", m.bar);
     this._icon.innerHTML = `<ha-icon icon="${esc(m.icon)}"></ha-icon>`;
     this._text.innerHTML = `<div class="name">${esc(m.name)}</div><div class="status">${esc(m.status)}</div>`;
+    this._text.classList.toggle("single", !m.status);
     this._end.innerHTML =
       (m.extreme ? `<div class="extreme"><ha-icon icon="${esc(m.extreme)}"></ha-icon></div>` : "") +
       (m.typeBadge ? `<div class="type">${esc(m.typeBadge)}</div>` : "") +
@@ -584,7 +592,7 @@ class SensorStatusCard extends HTMLElement {
     this._bar.innerHTML = m.dot === null ? "" : `<div class="dot" style="left:${m.dot.toFixed(2)}%"></div>`;
     this._card.setAttribute(
       "aria-label",
-      `${m.name}, ${m.value}, ${m.status}${m.typeBadge ? `, ${m.typeBadge}` : ""}`
+      [m.name, m.value, m.status, m.typeBadge].filter(Boolean).join(", ")
     );
   }
 
@@ -653,6 +661,8 @@ const EDITOR_LABELS = {
   decimals: "Decimals",
   scale_min: "Scale minimum",
   scale_max: "Scale maximum",
+  show_badge: "Show badge",
+  show_status: "Show status text",
 };
 
 const MODE_OPTIONS = [
@@ -689,6 +699,10 @@ const getEditorSchema = (config, hass) => {
     { name: "icon", selector: { icon: {} } },
     ...(isBattery ? [{ name: "battery_type", selector: { text: {} } }] : []),
     ...(isDisk ? [{ name: "disk_size", selector: { entity: { domain: "sensor" } } }] : []),
+    ...(resolved === "battery" || resolved === "disk"
+      ? [{ name: "show_badge", selector: { boolean: {} } }]
+      : []),
+    { name: "show_status", selector: { boolean: {} } },
     { name: "tap_action", selector: { ui_action: {} } },
     {
       type: "expandable",
@@ -785,13 +799,16 @@ class SensorStatusCardEditor extends HTMLElement {
       this._form.addEventListener("value-changed", (ev) => {
         ev.stopPropagation();
         const config = prune({ ...this._config, ...ev.detail.value });
+        if (config.show_badge === true) delete config.show_badge;
+        if (config.show_status === true) delete config.show_status;
+        if (config.mode === "auto") delete config.mode;
         this.dispatchEvent(new CustomEvent("config-changed", { detail: { config }, bubbles: true, composed: true }));
       });
       this.appendChild(this._form);
     }
     this._form.hass = this._hass;
     this._form.schema = getEditorSchema(this._config, this._hass);
-    this._form.data = { mode: "auto", ...this._config };
+    this._form.data = { mode: "auto", show_badge: true, show_status: true, ...this._config };
   }
 }
 
