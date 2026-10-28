@@ -8,7 +8,7 @@
 const CARD_TAG = "sensor-status-card";
 const EDITOR_TAG = "sensor-status-card-editor";
 const CARD_NAME = "Sensor Status Card";
-const CARD_VERSION = "0.3.0-beta";
+const CARD_VERSION = "0.3.1-beta";
 
 // Fallback/Default colors used when no explicit color or zone is provided.
 const COLOR_MAP = {
@@ -187,7 +187,8 @@ const DEVICE_CLASS_MODE = Object.fromEntries(Object.entries(MODE_DEVICE_CLASS).m
 
 const RAM_RE = /(?:^|[^a-z])(ram|memory|mem|swap)(?:[^a-z]|$)/;
 const CPU_RE = /(?:^|[^a-z])(cpu|processor)(?:[^a-z]|$)/;
-const DISK_RE = /(?:^|[^a-z])(disk|storage|filesystem|ssd|hdd|nvme)(?:[^a-z]|$)/;
+const DISK_RE = /(disk|storage|filesystem|ssd|hdd|nvme|mmcblk|partition|volume)/;
+const DRIVE_RE = /(?:^|[^a-z])(sd[a-z]\d*|vd[a-z]\d*|xvd[a-z]\d*|nvme\d+n\d+(?:p\d+)?)(?:[^a-z0-9]|$)/;
 
 const detectMode = (hass, entityId) => {
   if (typeof entityId !== "string" || !entityId.startsWith("sensor.")) return null;
@@ -202,7 +203,7 @@ const detectMode = (hass, entityId) => {
   const text = `${entityId} ${st.attributes?.friendly_name ?? ""}`.toLowerCase();
   if (RAM_RE.test(text)) return "ram";
   if (CPU_RE.test(text)) return "cpu";
-  if (DISK_RE.test(text)) return "disk";
+  if (DISK_RE.test(text) || DRIVE_RE.test(text)) return "disk";
   return null;
 };
 
