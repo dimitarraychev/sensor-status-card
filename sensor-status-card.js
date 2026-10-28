@@ -8,7 +8,7 @@
 const CARD_TAG = "sensor-status-card";
 const EDITOR_TAG = "sensor-status-card-editor";
 const CARD_NAME = "Sensor Status Card";
-const CARD_VERSION = "0.2.0-beta";
+const CARD_VERSION = "0.3.0-beta";
 
 // Fallback/Default colors used when no explicit color or zone is provided.
 const COLOR_MAP = {
@@ -148,6 +148,18 @@ const PRESETS = {
     zones: ["green", "lime", "yellow", "orange", "red"],
     thresholds: { very_low: 30, low: 60, high: 85, very_high: 95 },
   },
+  disk: {
+    icon: "mdi:harddisk",
+    unit: "%",
+    decimals: 1,
+    scale_min: 0,
+    scale_max: 100,
+    minIcon: "mdi:harddisk-plus",
+    maxIcon: "mdi:harddisk-remove",
+    labels: ["Plenty free", "Healthy", "Filling up", "Almost full", "Critical"],
+    zones: ["green", "lime", "yellow", "orange", "red"],
+    thresholds: { very_low: 50, low: 70, high: 85, very_high: 95 },
+  },
   custom: {
     icon: "mdi:gauge",
     unit: "",
@@ -175,6 +187,7 @@ const DEVICE_CLASS_MODE = Object.fromEntries(Object.entries(MODE_DEVICE_CLASS).m
 
 const RAM_RE = /(?:^|[^a-z])(ram|memory|mem|swap)(?:[^a-z]|$)/;
 const CPU_RE = /(?:^|[^a-z])(cpu|processor)(?:[^a-z]|$)/;
+const DISK_RE = /(?:^|[^a-z])(disk|storage|filesystem|ssd|hdd|nvme)(?:[^a-z]|$)/;
 
 const detectMode = (hass, entityId) => {
   if (typeof entityId !== "string" || !entityId.startsWith("sensor.")) return null;
@@ -189,6 +202,7 @@ const detectMode = (hass, entityId) => {
   const text = `${entityId} ${st.attributes?.friendly_name ?? ""}`.toLowerCase();
   if (RAM_RE.test(text)) return "ram";
   if (CPU_RE.test(text)) return "cpu";
+  if (DISK_RE.test(text)) return "disk";
   return null;
 };
 
@@ -633,6 +647,7 @@ const MODE_OPTIONS = [
   { value: "battery", label: "Battery" },
   { value: "cpu", label: "CPU" },
   { value: "ram", label: "RAM" },
+  { value: "disk", label: "Disk usage" },
   { value: "custom", label: "Custom" },
 ];
 
@@ -767,7 +782,7 @@ if (!window.customCards.some((c) => c.type === CARD_TAG)) {
     type: CARD_TAG,
     name: CARD_NAME,
     description:
-      "Any numeric sensor as a status row: temperature, humidity, air quality, battery, CPU, RAM or custom, with a five-zone bar and lowest/highest badge.",
+      "Any numeric sensor as a status row: temperature, humidity, air quality, battery, CPU, RAM, disk or custom, with a five-zone bar and lowest/highest badge.",
     preview: true,
     getEntitySuggestion: (hass, entityId) => SensorStatusCard.getEntitySuggestion(hass, entityId),
   });
