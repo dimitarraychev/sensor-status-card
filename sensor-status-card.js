@@ -8,7 +8,7 @@
 const CARD_TAG = "sensor-status-card";
 const EDITOR_TAG = "sensor-status-card-editor";
 const CARD_NAME = "Sensor Status Card";
-const CARD_VERSION = "0.3.1-beta";
+const CARD_VERSION = "0.3.2-beta";
 
 // Fallback/Default colors used when no explicit color or zone is provided.
 const COLOR_MAP = {
@@ -423,6 +423,18 @@ class SensorStatusCard extends HTMLElement {
     return s;
   }
 
+  _sizeValue(spec) {
+    if (spec === undefined || spec === null || spec === "") return "";
+    const s = String(spec);
+    const st = ENTITY_ID.test(s) ? this._hass?.states[s] : null;
+    if (!st) return ENTITY_ID.test(s) ? "" : s; // plain text fallback, empty if entity missing
+    if (UNAVAILABLE.includes(st.state)) return "";
+    const n = parseFloat(st.state);
+    if (!Number.isFinite(n)) return String(st.state);
+    const unit = st.attributes?.unit_of_measurement;
+    return [String(Number(n.toFixed(1))), unit].filter(Boolean).join(" ");
+  }
+
   _color(spec) {
     if (!spec) return null;
     if (COLOR_MAP[spec]) {
@@ -528,7 +540,12 @@ class SensorStatusCard extends HTMLElement {
         .join(",") +
       ")";
 
-    const typeBadge = mode === "battery" ? this._textValue(cfg.battery_type) : "";
+    const typeBadge =
+      mode === "battery"
+        ? this._textValue(cfg.battery_type)
+        : mode === "disk"
+          ? this._sizeValue(cfg.disk_size)
+          : "";
 
     const icon =
       cfg.icon ??
@@ -620,6 +637,7 @@ const EDITOR_LABELS = {
   min_icon: "Minimum badge icon",
   max_icon: "Maximum badge icon",
   battery_type: "Battery type (text or entity ID)",
+  disk_size: "Total disk size sensor (optional)",
   tap_action: "Tap action",
   thresholds: "Thresholds",
   very_low: "Very low (below)",
@@ -660,7 +678,9 @@ const sensorSelector = (mode, extra = {}) => {
 const getEditorSchema = (config, hass) => {
   const mode = config.mode || "auto";
   const showMinMax = config.show_min_max === true;
-  const isBattery = resolveMode(hass, config) === "battery";
+  const resolved = resolveMode(hass, config);
+  const isBattery = resolved === "battery";
+  const isDisk = resolved === "disk";
 
   return [
     { name: "entity", required: true, selector: sensorSelector(mode) },
@@ -668,6 +688,7 @@ const getEditorSchema = (config, hass) => {
     { name: "name", selector: { text: {} } },
     { name: "icon", selector: { icon: {} } },
     ...(isBattery ? [{ name: "battery_type", selector: { text: {} } }] : []),
+    ...(isDisk ? [{ name: "disk_size", selector: { entity: { domain: "sensor" } } }] : []),
     { name: "tap_action", selector: { ui_action: {} } },
     {
       type: "expandable",
