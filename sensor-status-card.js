@@ -8,7 +8,7 @@
 const CARD_TAG = "sensor-status-card";
 const EDITOR_TAG = "sensor-status-card-editor";
 const CARD_NAME = "Sensor Status Card";
-const CARD_VERSION = "0.3.4-beta";
+const CARD_VERSION = "0.3.5-beta";
 
 // Fallback/Default colors used when no explicit color or zone is provided.
 const COLOR_MAP = {
@@ -307,7 +307,6 @@ class SensorStatusCard extends HTMLElement {
           text-overflow: ellipsis;
           color: var(--ssc-color);
           background: color-mix(in srgb, var(--ssc-color) 20%, transparent);
-          border: 1px solid color-mix(in srgb, var(--ssc-color) 45%, transparent);
         }
         .value {
           font-size: 1rem;
