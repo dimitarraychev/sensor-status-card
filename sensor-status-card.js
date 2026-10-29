@@ -8,7 +8,7 @@
 const CARD_TAG = "sensor-status-card";
 const EDITOR_TAG = "sensor-status-card-editor";
 const CARD_NAME = "Sensor Status Card";
-const CARD_VERSION = "0.3.5-beta";
+const CARD_VERSION = "0.3.6-beta";
 
 // Fallback/Default colors used when no explicit color or zone is provided.
 const COLOR_MAP = {
@@ -547,7 +547,7 @@ class SensorStatusCard extends HTMLElement {
           return `${c} ${stops[i].toFixed(2)}%, ${c} ${stops[i + 1].toFixed(2)}%`;
         })
         .join(",") +
-      ")";
+      ";";
 
     const typeBadge =
       cfg.show_badge === false
@@ -574,6 +574,7 @@ class SensorStatusCard extends HTMLElement {
       bar,
       dot: valid ? pos(raw) : null,
       extreme: isMin ? cfg.min_icon ?? preset.minIcon : isMax ? cfg.max_icon ?? preset.maxIcon : null,
+      showBar: cfg.show_bar !== false,
     };
   }
 
@@ -593,7 +594,10 @@ class SensorStatusCard extends HTMLElement {
       (m.extreme ? `<div class="extreme"><ha-icon icon="${esc(m.extreme)}"></ha-icon></div>` : "") +
       (m.typeBadge ? `<div class="type">${esc(m.typeBadge)}</div>` : "") +
       `<div class="value">${esc(m.value)}</div>`;
-    this._bar.innerHTML = m.dot === null ? "" : `<div class="dot" style="left:${m.dot.toFixed(2)}%"></div>`;
+    
+    this._bar.hidden = !m.showBar;
+    this._bar.innerHTML = m.showBar && m.dot !== null ? `<div class="dot" style="left:${m.dot.toFixed(2)}%"></div>` : "";
+    
     this._card.setAttribute(
       "aria-label",
       [m.name, m.value, m.status, m.typeBadge].filter(Boolean).join(", ")
@@ -667,6 +671,7 @@ const EDITOR_LABELS = {
   scale_max: "Scale maximum",
   show_badge: "Show badge",
   show_status: "Show status text",
+  show_bar: "Show bottom zone bar",
 };
 
 const MODE_OPTIONS = [
@@ -739,6 +744,7 @@ const getEditorSchema = (config, hass) => {
       title: "Display settings",
       flatten: true,
       schema: [
+        { name: "show_bar", selector: { boolean: {} } },
         { name: "unit", selector: { text: {} } },
         { name: "decimals", selector: { number: { min: 0, max: 3, mode: "box" } } },
         { name: "scale_min", selector: { number: { mode: "box" } } },
@@ -805,6 +811,7 @@ class SensorStatusCardEditor extends HTMLElement {
         const config = prune({ ...this._config, ...ev.detail.value });
         if (config.show_badge === true) delete config.show_badge;
         if (config.show_status === true) delete config.show_status;
+        if (config.show_bar === true) delete config.show_bar;
         if (config.mode === "auto") delete config.mode;
         this.dispatchEvent(new CustomEvent("config-changed", { detail: { config }, bubbles: true, composed: true }));
       });
@@ -812,7 +819,7 @@ class SensorStatusCardEditor extends HTMLElement {
     }
     this._form.hass = this._hass;
     this._form.schema = getEditorSchema(this._config, this._hass);
-    this._form.data = { mode: "auto", show_badge: true, show_status: true, ...this._config };
+    this._form.data = { mode: "auto", show_badge: true, show_status: true, show_bar: true, ...this._config };
   }
 }
 
