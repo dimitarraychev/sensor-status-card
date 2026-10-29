@@ -8,7 +8,7 @@
 const CARD_TAG = "sensor-status-card";
 const EDITOR_TAG = "sensor-status-card-editor";
 const CARD_NAME = "Sensor Status Card";
-const CARD_VERSION = "0.5.0-beta";
+const CARD_VERSION = "0.5.1-beta";
 
 // Fallback/Default colors used when no explicit color or zone is provided.
 const COLOR_MAP = {
@@ -343,13 +343,13 @@ class SensorStatusCard extends HTMLElement {
         }
 
         /* ---------- Mushroom style (standard inset) ---------- */
-        .card.mushroom { height: 56px; }
+        .card.mushroom { height: 60px; }
         .card.mushroom .pill {
           overflow: hidden;
-          padding: 10px 14px;
+          padding: 8px 12px;
           gap: 10px;
           border: 1px solid color-mix(in srgb, var(--ssc-color) 30%, transparent);
-          border-radius: var(--ha-card-border-radius, 12px);
+          border-radius: var(--ha-card-border-radius, 16px);
           background: color-mix(in srgb, var(--ssc-color) 8%, transparent);
           box-shadow: none;
           -webkit-backdrop-filter: blur(12px);
@@ -359,14 +359,19 @@ class SensorStatusCard extends HTMLElement {
           width: 40px;
           height: 40px;
           margin: 0;
-          --mdc-icon-size: 24px;
+          --mdc-icon-size: 22px;
+        }
+        .card.mushroom .text {
+          align-self: center;
+          margin-top: 0;
+          padding-bottom: 2px;
         }
         .card.mushroom .bar { left: 62px; right: 16px; bottom: 6px; }
 
         /* ---------- Enhanced Mushroom style (bleeding corner icon & glow) ---------- */
-        .card.enhanced { height: 68px; }
+        .card.enhanced { height: 68px; overflow: visible; }
         .card.enhanced .pill {
-          overflow: hidden;
+          overflow: visible;
           padding: 12px 8px;
           gap: 12px;
           border: 1px solid color-mix(in srgb, var(--ssc-color) 30%, transparent);
@@ -381,6 +386,7 @@ class SensorStatusCard extends HTMLElement {
           height: 65px;
           margin: -18px 0 0 -18px;
           --mdc-icon-size: 44px;
+          z-index: 2;
         }
         .card.enhanced .text,
         .card.enhanced .text.single {
@@ -411,7 +417,7 @@ class SensorStatusCard extends HTMLElement {
     this._bar = $(".bar");
     this._card.addEventListener("click", (e) => {
       this._onTap();
-      if (e.detail) this._card.blur(); // pointer/touch click: don't keep focus
+      if (e.detail) this._card.blur();
     });
     this.shadowRoot.addEventListener("pointerdown", () => this._card.classList.remove("kbd"), true);
     this.shadowRoot.addEventListener("keydown", (e) => { if (e.key === "Tab") this._card.classList.add("kbd"); }, true);
@@ -494,7 +500,7 @@ class SensorStatusCard extends HTMLElement {
     if (spec === undefined || spec === null || spec === "") return "";
     const s = String(spec);
     const st = ENTITY_ID.test(s) ? this._hass?.states[s] : null;
-    if (!st) return ENTITY_ID.test(s) ? "" : s; // plain text fallback, empty if entity missing
+    if (!st) return ENTITY_ID.test(s) ? "" : s;
     if (UNAVAILABLE.includes(st.state)) return "";
     const n = parseFloat(st.state);
     if (!Number.isFinite(n)) return String(st.state);
