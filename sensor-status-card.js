@@ -8,7 +8,7 @@
 const CARD_TAG = "sensor-status-card";
 const EDITOR_TAG = "sensor-status-card-editor";
 const CARD_NAME = "Sensor Status Card";
-const CARD_VERSION = "0.3.7-beta";
+const CARD_VERSION = "0.3.8-beta";
 
 // Fallback/Default colors used when no explicit color or zone is provided.
 const COLOR_MAP = {
@@ -264,6 +264,11 @@ class SensorStatusCard extends HTMLElement {
           align-self: center;
           margin-top: 0;
           padding-bottom: 4px;
+        }
+        .card.nobar .text {
+          align-self: center;
+          margin-top: 0;
+          padding-bottom: 0;
         }
         .name {
           font-size: 14px;
@@ -595,6 +600,7 @@ class SensorStatusCard extends HTMLElement {
       (m.typeBadge ? `<div class="type">${esc(m.typeBadge)}</div>` : "") +
       `<div class="value">${esc(m.value)}</div>`;
     
+    this._card.classList.toggle("nobar", !m.showBar);
     this._bar.hidden = !m.showBar;
     this._bar.innerHTML = m.showBar && m.dot !== null ? `<div class="dot" style="left:${m.dot.toFixed(2)}%"></div>` : "";
     
