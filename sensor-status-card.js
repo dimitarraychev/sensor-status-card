@@ -8,7 +8,7 @@
 const CARD_TAG = "sensor-status-card";
 const EDITOR_TAG = "sensor-status-card-editor";
 const CARD_NAME = "Sensor Status Card";
-const CARD_VERSION = "0.5.1-beta";
+const CARD_VERSION = "0.5.2-beta";
 
 // Fallback/Default colors used when no explicit color or zone is provided.
 const COLOR_MAP = {
@@ -341,37 +341,10 @@ class SensorStatusCard extends HTMLElement {
           border: 1px solid rgba(255, 255, 255, 0.8);
           box-shadow: 0 0 8px var(--ssc-color);
         }
-
-        /* ---------- Mushroom style (standard inset) ---------- */
-        .card.mushroom { height: 60px; }
+        /* ---------- Mushroom style ---------- */
+        .card.mushroom { height: 68px; }
         .card.mushroom .pill {
           overflow: hidden;
-          padding: 8px 12px;
-          gap: 10px;
-          border: 1px solid color-mix(in srgb, var(--ssc-color) 30%, transparent);
-          border-radius: var(--ha-card-border-radius, 16px);
-          background: color-mix(in srgb, var(--ssc-color) 8%, transparent);
-          box-shadow: none;
-          -webkit-backdrop-filter: blur(12px);
-          backdrop-filter: blur(12px);
-        }
-        .card.mushroom .icon {
-          width: 40px;
-          height: 40px;
-          margin: 0;
-          --mdc-icon-size: 22px;
-        }
-        .card.mushroom .text {
-          align-self: center;
-          margin-top: 0;
-          padding-bottom: 2px;
-        }
-        .card.mushroom .bar { left: 62px; right: 16px; bottom: 6px; }
-
-        /* ---------- Enhanced Mushroom style (bleeding corner icon & glow) ---------- */
-        .card.enhanced { height: 68px; overflow: visible; }
-        .card.enhanced .pill {
-          overflow: visible;
           padding: 12px 8px;
           gap: 12px;
           border: 1px solid color-mix(in srgb, var(--ssc-color) 30%, transparent);
@@ -381,22 +354,20 @@ class SensorStatusCard extends HTMLElement {
           -webkit-backdrop-filter: blur(12px);
           backdrop-filter: blur(12px);
         }
-        .card.enhanced .icon {
+        .card.mushroom .icon {
           width: 65px;
           height: 65px;
           margin: -18px 0 0 -18px;
           --mdc-icon-size: 44px;
-          z-index: 2;
         }
-        .card.enhanced .text,
-        .card.enhanced .text.single {
+        .card.mushroom .text,
+        .card.mushroom .text.single {
           align-self: center;
           margin: 0;
           padding-bottom: 0;
         }
-        .card.enhanced .end { padding: 0 4px 0 0; }
-        .card.enhanced .bar { left: 67px; right: 16px; bottom: 6px; }
-
+        .card.mushroom .end { padding: 0 4px 0 0; }
+        .card.mushroom .bar { left: 67px; right: 16px; bottom: 6px; }
         @media (prefers-reduced-motion: no-preference) {
           .dot { transition: left 0.6s ease; }
         }
@@ -417,7 +388,7 @@ class SensorStatusCard extends HTMLElement {
     this._bar = $(".bar");
     this._card.addEventListener("click", (e) => {
       this._onTap();
-      if (e.detail) this._card.blur();
+      if (e.detail) this._card.blur(); // pointer/touch click: don't keep focus
     });
     this.shadowRoot.addEventListener("pointerdown", () => this._card.classList.remove("kbd"), true);
     this.shadowRoot.addEventListener("keydown", (e) => { if (e.key === "Tab") this._card.classList.add("kbd"); }, true);
@@ -476,7 +447,7 @@ class SensorStatusCard extends HTMLElement {
   }
 
   getGridOptions() {
-    if (this._config?.card_style === "enhanced" || this._config?.card_style === "mushroom") {
+    if (this._config?.card_style === "mushroom") {
       return { columns: 12, rows: "auto", min_columns: 6 };
     }
     return { columns: 12, rows: 1, min_columns: 6, min_rows: 1 };
@@ -500,7 +471,7 @@ class SensorStatusCard extends HTMLElement {
     if (spec === undefined || spec === null || spec === "") return "";
     const s = String(spec);
     const st = ENTITY_ID.test(s) ? this._hass?.states[s] : null;
-    if (!st) return ENTITY_ID.test(s) ? "" : s;
+    if (!st) return ENTITY_ID.test(s) ? "" : s; // plain text fallback, empty if entity missing
     if (UNAVAILABLE.includes(st.state)) return "";
     const n = parseFloat(st.state);
     if (!Number.isFinite(n)) return String(st.state);
@@ -628,9 +599,6 @@ class SensorStatusCard extends HTMLElement {
       stateObj?.attributes?.icon ??
       preset.icon;
 
-    const rawStyle = cfg.card_style || "enhanced";
-    const cardStyle = ["bubble", "mushroom", "enhanced"].includes(rawStyle) ? rawStyle : "enhanced";
-
     return {
       name: cfg.name ?? stateObj?.attributes?.friendly_name ?? cfg.entity,
       icon,
@@ -642,7 +610,7 @@ class SensorStatusCard extends HTMLElement {
       dot: valid ? pos(raw) : null,
       extreme: isMin ? cfg.min_icon ?? preset.minIcon : isMax ? cfg.max_icon ?? preset.maxIcon : null,
       showBar: cfg.show_bar !== false,
-      cardStyle,
+      cardStyle: cfg.card_style === "mushroom" ? "mushroom" : "bubble",
     };
   }
 
@@ -663,9 +631,7 @@ class SensorStatusCard extends HTMLElement {
       (m.typeBadge ? `<div class="type">${esc(m.typeBadge)}</div>` : "") +
       `<div class="value">${esc(m.value)}</div>`;
     
-    this._card.classList.toggle("bubble", m.cardStyle === "bubble");
     this._card.classList.toggle("mushroom", m.cardStyle === "mushroom");
-    this._card.classList.toggle("enhanced", m.cardStyle === "enhanced");
     this._card.classList.toggle("nobar", !m.showBar);
     this._bar.hidden = !m.showBar;
     this._bar.innerHTML = m.showBar && m.dot !== null ? `<div class="dot" style="left:${m.dot.toFixed(2)}%"></div>` : "";
@@ -822,9 +788,8 @@ const getEditorSchema = (config, hass) => {
             select: {
               mode: "dropdown",
               options: [
-                { value: "enhanced", label: "Mushroom-like Enhanced" },
-                { value: "mushroom", label: "Mushroom-like" },
-                { value: "bubble", label: "Bubble-like" },
+                { value: "bubble", label: "Bubble Card" },
+                { value: "mushroom", label: "Mushroom" },
               ],
             },
           },
@@ -895,7 +860,7 @@ class SensorStatusCardEditor extends HTMLElement {
       this._form.addEventListener("value-changed", (ev) => {
         ev.stopPropagation();
         const config = prune({ ...this._config, ...ev.detail.value });
-        if (config.card_style === "enhanced") delete config.card_style;
+        if (config.card_style === "bubble") delete config.card_style;
         if (config.show_badge === true) delete config.show_badge;
         if (config.show_status === true) delete config.show_status;
         if (config.show_bar === true) delete config.show_bar;
@@ -906,7 +871,7 @@ class SensorStatusCardEditor extends HTMLElement {
     }
     this._form.hass = this._hass;
     this._form.schema = getEditorSchema(this._config, this._hass);
-    this._form.data = { mode: "auto", show_badge: true, show_status: true, show_bar: true, card_style: "enhanced", ...this._config };
+    this._form.data = { mode: "auto", show_badge: true, show_status: true, show_bar: true, card_style: "bubble", ...this._config };
   }
 }
 
