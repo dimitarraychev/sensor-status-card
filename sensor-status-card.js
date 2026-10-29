@@ -237,8 +237,8 @@ class SensorStatusCard extends HTMLElement {
           background: color-mix(in srgb, var(--ssc-color) 10%, transparent);
           box-shadow: inset 0 0 10px color-mix(in srgb, var(--ssc-color) 45%, transparent);
         }
-        .card:focus-visible { outline: none; }
-        .card:focus-visible .pill { outline: 2px solid var(--ssc-color); outline-offset: 2px; }
+        .card:focus, .card:focus-visible { outline: none; }
+        .card.kbd:focus-visible .pill { outline: 2px solid var(--ssc-color); outline-offset: 2px; }
         .icon {
           flex: none;
           width: 42px;
@@ -355,7 +355,12 @@ class SensorStatusCard extends HTMLElement {
     this._text = $(".text");
     this._end = $(".end");
     this._bar = $(".bar");
-    this._card.addEventListener("click", () => this._onTap());
+    this._card.addEventListener("click", (e) => {
+      this._onTap();
+      if (e.detail) this._card.blur(); // pointer/touch click: don't keep focus
+    });
+    this.shadowRoot.addEventListener("pointerdown", () => this._card.classList.remove("kbd"), true);
+    this.shadowRoot.addEventListener("keydown", (e) => { if (e.key === "Tab") this._card.classList.add("kbd"); }, true);
     this._card.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
