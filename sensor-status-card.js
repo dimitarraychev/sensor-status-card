@@ -8,7 +8,7 @@
 const CARD_TAG = "sensor-status-card";
 const EDITOR_TAG = "sensor-status-card-editor";
 const CARD_NAME = "Sensor Status Card";
-const CARD_VERSION = "0.4.0-beta";
+const CARD_VERSION = "0.4.1-beta";
 
 // Fallback/Default colors used when no explicit color or zone is provided.
 const COLOR_MAP = {
@@ -341,10 +341,12 @@ class SensorStatusCard extends HTMLElement {
           border: 1px solid rgba(255, 255, 255, 0.8);
           box-shadow: 0 0 8px var(--ssc-color);
         }
-        /* ---------- Mushroom style (matches the AC card) ---------- */
-        .card.mushroom { height: 65px; }
+        /* ---------- Mushroom style ---------- */
+        .card.mushroom { height: 68px; }
         .card.mushroom .pill {
           overflow: hidden;
+          padding: 12px 8px;
+          gap: 12px;
           border: 1px solid color-mix(in srgb, var(--ssc-color) 30%, transparent);
           border-radius: var(--ha-card-border-radius, 12px);
           background: color-mix(in srgb, var(--ssc-color) 8%, transparent);
@@ -355,18 +357,17 @@ class SensorStatusCard extends HTMLElement {
         .card.mushroom .icon {
           width: 65px;
           height: 65px;
-          margin: 0 4px 0 -6px;
+          margin: -18px 0 0 -18px;
           --mdc-icon-size: 44px;
         }
         .card.mushroom .text,
         .card.mushroom .text.single {
           align-self: center;
-          margin-top: 0;
-          margin-left: 0;
+          margin: 0;
           padding-bottom: 0;
         }
-        .card.mushroom .end { padding: 0 12px 0 8px; }
-        .card.mushroom .bar { left: 63px; right: 16px; bottom: 7px; }
+        .card.mushroom .end { padding: 0 4px 0 0; }
+        .card.mushroom .bar { left: 67px; right: 16px; bottom: 6px; }
         @media (prefers-reduced-motion: no-preference) {
           .dot { transition: left 0.6s ease; }
         }
