@@ -8,7 +8,7 @@
 const CARD_TAG = "sensor-status-card";
 const EDITOR_TAG = "sensor-status-card-editor";
 const CARD_NAME = "Sensor Status Card";
-const CARD_VERSION = "0.3.8-beta";
+const CARD_VERSION = "0.4.8-beta";
 
 // Fallback/Default colors used when no explicit color or zone is provided.
 const COLOR_MAP = {
@@ -341,6 +341,32 @@ class SensorStatusCard extends HTMLElement {
           border: 1px solid rgba(255, 255, 255, 0.8);
           box-shadow: 0 0 8px var(--ssc-color);
         }
+        /* ---------- Mushroom style (matches the AC card) ---------- */
+        .card.mushroom { height: 65px; }
+        .card.mushroom .pill {
+          overflow: hidden;
+          border: 1px solid color-mix(in srgb, var(--ssc-color) 30%, transparent);
+          border-radius: var(--ha-card-border-radius, 12px);
+          background: color-mix(in srgb, var(--ssc-color) 8%, transparent);
+          box-shadow: none;
+          -webkit-backdrop-filter: blur(12px);
+          backdrop-filter: blur(12px);
+        }
+        .card.mushroom .icon {
+          width: 65px;
+          height: 65px;
+          margin: 0 4px 0 -6px;
+          --mdc-icon-size: 44px;
+        }
+        .card.mushroom .text,
+        .card.mushroom .text.single {
+          align-self: center;
+          margin-top: 0;
+          margin-left: 0;
+          padding-bottom: 0;
+        }
+        .card.mushroom .end { padding: 0 12px 0 8px; }
+        .card.mushroom .bar { left: 63px; right: 16px; bottom: 7px; }
         @media (prefers-reduced-motion: no-preference) {
           .dot { transition: left 0.6s ease; }
         }
@@ -420,6 +446,9 @@ class SensorStatusCard extends HTMLElement {
   }
 
   getGridOptions() {
+    if (this._config?.card_style === "mushroom") {
+      return { columns: 12, rows: "auto", min_columns: 6 };
+    }
     return { columns: 12, rows: 1, min_columns: 6, min_rows: 1 };
   }
 
@@ -580,6 +609,7 @@ class SensorStatusCard extends HTMLElement {
       dot: valid ? pos(raw) : null,
       extreme: isMin ? cfg.min_icon ?? preset.minIcon : isMax ? cfg.max_icon ?? preset.maxIcon : null,
       showBar: cfg.show_bar !== false,
+      cardStyle: cfg.card_style === "mushroom" ? "mushroom" : "bubble",
     };
   }
 
@@ -600,6 +630,7 @@ class SensorStatusCard extends HTMLElement {
       (m.typeBadge ? `<div class="type">${esc(m.typeBadge)}</div>` : "") +
       `<div class="value">${esc(m.value)}</div>`;
     
+    this._card.classList.toggle("mushroom", m.cardStyle === "mushroom");
     this._card.classList.toggle("nobar", !m.showBar);
     this._bar.hidden = !m.showBar;
     this._bar.innerHTML = m.showBar && m.dot !== null ? `<div class="dot" style="left:${m.dot.toFixed(2)}%"></div>` : "";
@@ -678,6 +709,7 @@ const EDITOR_LABELS = {
   show_badge: "Show badge",
   show_status: "Show status text",
   show_bar: "Show bottom zone bar",
+  card_style: "Card style (icon, icon box and borders)",
 };
 
 const MODE_OPTIONS = [
@@ -749,6 +781,18 @@ const getEditorSchema = (config, hass) => {
       title: "Display settings",
       flatten: true,
       schema: [
+        {
+          name: "card_style",
+          selector: {
+            select: {
+              mode: "dropdown",
+              options: [
+                { value: "bubble", label: "Bubble Card" },
+                { value: "mushroom", label: "Mushroom" },
+              ],
+            },
+          },
+        },
         { name: "show_status", selector: { boolean: {} } },
         { name: "show_bar", selector: { boolean: {} } },
         { name: "unit", selector: { text: {} } },
@@ -815,6 +859,7 @@ class SensorStatusCardEditor extends HTMLElement {
       this._form.addEventListener("value-changed", (ev) => {
         ev.stopPropagation();
         const config = prune({ ...this._config, ...ev.detail.value });
+        if (config.card_style === "bubble") delete config.card_style;
         if (config.show_badge === true) delete config.show_badge;
         if (config.show_status === true) delete config.show_status;
         if (config.show_bar === true) delete config.show_bar;
@@ -825,7 +870,7 @@ class SensorStatusCardEditor extends HTMLElement {
     }
     this._form.hass = this._hass;
     this._form.schema = getEditorSchema(this._config, this._hass);
-    this._form.data = { mode: "auto", show_badge: true, show_status: true, show_bar: true, ...this._config };
+    this._form.data = { mode: "auto", show_badge: true, show_status: true, show_bar: true, card_style: "bubble", ...this._config };
   }
 }
 
