@@ -547,7 +547,7 @@ class SensorStatusCard extends HTMLElement {
           return `${c} ${stops[i].toFixed(2)}%, ${c} ${stops[i + 1].toFixed(2)}%`;
         })
         .join(",") +
-      ";";
+      ")";
 
     const typeBadge =
       cfg.show_badge === false
@@ -711,7 +711,6 @@ const getEditorSchema = (config, hass) => {
     ...(resolved === "battery" || resolved === "disk"
       ? [{ name: "show_badge", selector: { boolean: {} } }]
       : []),
-    { name: "show_status", selector: { boolean: {} } },
     { name: "tap_action", selector: { ui_action: {} } },
     {
       type: "expandable",
@@ -744,6 +743,7 @@ const getEditorSchema = (config, hass) => {
       title: "Display settings",
       flatten: true,
       schema: [
+        { name: "show_status", selector: { boolean: {} } },
         { name: "show_bar", selector: { boolean: {} } },
         { name: "unit", selector: { text: {} } },
         { name: "decimals", selector: { number: { min: 0, max: 3, mode: "box" } } },
