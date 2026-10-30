@@ -8,7 +8,7 @@
 const CARD_TAG = "sensor-status-card";
 const EDITOR_TAG = "sensor-status-card-editor";
 const CARD_NAME = "Sensor Status Card";
-const CARD_VERSION = "0.5.3-beta";
+const CARD_VERSION = "0.5.4-beta";
 
 // Fallback/Default colors used when no explicit color or zone is provided.
 const COLOR_MAP = {
@@ -345,12 +345,9 @@ class SensorStatusCard extends HTMLElement {
         .card.mushroom { height: 68px; }
         .card.mushroom .pill {
           overflow: hidden;
-          padding: 12px 8px;
+          padding: 13px 9px;
           gap: 12px;
-          border: 1px solid color-mix(in srgb, var(--ssc-color) 30%, transparent);
           border-radius: var(--ha-card-border-radius, 12px);
-          background: color-mix(in srgb, var(--ssc-color) 8%, transparent);
-          box-shadow: none;
           -webkit-backdrop-filter: blur(12px);
           backdrop-filter: blur(12px);
         }
@@ -367,7 +364,7 @@ class SensorStatusCard extends HTMLElement {
           padding-bottom: 0;
         }
         .card.mushroom .end { padding: 0 4px 0 0; }
-        .card.mushroom .bar { left: 67px; right: 16px; bottom: 6px; }
+        .card.mushroom .bar { left: 68px; right: 17px; bottom: 7px; }
         @media (prefers-reduced-motion: no-preference) {
           .dot { transition: left 0.6s ease; }
         }
@@ -532,8 +529,8 @@ class SensorStatusCard extends HTMLElement {
       cfg.zone_4 ?? cfg.zone_colors?.[3] ?? preset.zones[3],
       cfg.zone_5 ?? cfg.zone_colors?.[4] ?? preset.zones[4],
     ];
-    const zones = zoneSpecs.map((z) => this._color(z) || COLOR_MAP.gray);
-    const gray = this._color("gray") || COLOR_MAP.gray;
+    const gray = COLOR_MAP.gray;
+    const zones = zoneSpecs.map((z) => this._color(z) || gray);
 
     const raw = stateObj ? parseFloat(stateObj.state) : NaN;
     const valid = Number.isFinite(raw);
