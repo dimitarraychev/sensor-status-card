@@ -8,7 +8,7 @@
 const CARD_TAG = "sensor-status-card";
 const EDITOR_TAG = "sensor-status-card-editor";
 const CARD_NAME = "Sensor Status Card";
-const CARD_VERSION = "0.5.2-beta";
+const CARD_VERSION = "0.5.3-beta";
 
 // Fallback/Default colors used when no explicit color or zone is provided.
 const COLOR_MAP = {
@@ -788,7 +788,7 @@ const getEditorSchema = (config, hass) => {
             select: {
               mode: "dropdown",
               options: [
-                { value: "bubble", label: "Bubble Card" },
+                { value: "bubble", label: "Bubble" },
                 { value: "mushroom", label: "Mushroom" },
               ],
             },
